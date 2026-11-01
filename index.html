@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Where to Eat</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Where to Eat">
+<meta name="theme-color" content="#000000">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+:root{
+  --bg:#000; --card:#0d0d1a; --card2:#15152a; --line:#25254a;
+  --text:#f2f2ff; --muted:#8c8cb3;
+  --blue:#4c8dff; --purple:#9b6bff; --good:#4c8dff;
+  --grad:linear-gradient(135deg,#4c8dff,#9b6bff);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",Segoe UI,Roboto,sans-serif;overscroll-behavior:none}
+body{display:flex;flex-direction:column;height:100dvh;padding-top:env(safe-area-inset-top)}
+header{padding:12px 16px 6px;display:flex;align-items:center;justify-content:space-between}
+header h1{font-size:22px;margin:0;font-weight:700;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+#sync{font-size:12px;color:var(--muted)}
+main{flex:1;min-height:0;position:relative}
+.tab{display:none;position:absolute;inset:0;overflow-y:auto;padding:8px 16px 96px;-webkit-overflow-scrolling:touch}
+.tab.on{display:block}
+#tab-map.on{padding:0;display:block}
+#map{position:absolute;inset:0;background:#000}
+nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:rgba(8,8,20,.96);border-top:1px solid var(--line);
+  padding-bottom:env(safe-area-inset-bottom);z-index:1000}
+nav button{flex:1;background:none;border:0;color:var(--muted);padding:10px 0 8px;font-size:11px;display:flex;flex-direction:column;align-items:center;gap:3px}
+nav button svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+nav button.on{color:var(--purple)}
+.filters{display:flex;flex-direction:column;gap:8px;margin:6px 0 12px}
+.seg{display:flex;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:3px}
+.seg button{flex:1;background:none;border:0;color:var(--muted);padding:8px 2px;border-radius:9px;font-size:13px;font-weight:600}
+.seg button.on{background:var(--grad);color:#fff}
+select,input,textarea{width:100%;background:var(--card);border:1px solid var(--line);color:var(--text);border-radius:12px;padding:12px;font-size:16px;font-family:inherit}
+select:focus,input:focus{outline:2px solid var(--purple)}
+.count{color:var(--muted);font-size:13px;margin:2px 2px 8px}
+.item{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:10px}
+.item.done{border-color:#2b3a78}
+.row{display:flex;gap:12px;align-items:flex-start}
+.chk{flex:none;width:30px;height:30px;border-radius:50%;border:2px solid var(--line);background:none;color:#fff;display:flex;align-items:center;justify-content:center;font-size:17px;padding:0}
+.chk.on{background:var(--grad);border-color:transparent}
+.info{flex:1;min-width:0}
+.name{font-weight:700;font-size:17px}
+.addr{color:var(--muted);font-size:13px;margin-top:2px;text-decoration:none;display:block}
+.chip{display:inline-block;font-size:11px;color:var(--purple);border:1px solid #3a2f6b;border-radius:99px;padding:2px 8px;margin-top:6px}
+.more{background:none;border:0;color:var(--muted);font-size:20px;padding:0 4px}
+.rate{margin-top:12px;padding-top:12px;border-top:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.stars button{background:none;border:0;font-size:26px;color:#33335a;padding:0 2px}
+.stars button.on{color:var(--purple)}
+.back{display:flex;gap:6px}
+.back button{background:var(--card2);border:1px solid var(--line);color:var(--muted);padding:7px 12px;border-radius:99px;font-size:13px;font-weight:600}
+.back button.yes.on{background:var(--blue);color:#fff;border-color:transparent}
+.back button.no.on{background:#3a3a55;color:#fff}
+.fab{position:fixed;right:18px;bottom:calc(76px + env(safe-area-inset-bottom));width:58px;height:58px;border-radius:50%;border:0;background:var(--grad);color:#fff;font-size:32px;line-height:1;box-shadow:0 6px 24px rgba(120,90,255,.5);z-index:1001}
+.empty{text-align:center;color:var(--muted);padding:40px 10px;font-size:15px}
+.sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;align-items:flex-end;z-index:2000}
+.sheet-bg.on{display:flex}
+.sheet{background:#0b0b18;border-top:1px solid var(--line);width:100%;border-radius:22px 22px 0 0;padding:20px 16px calc(24px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:12px;max-height:90dvh;overflow:auto}
+.sheet h2{margin:0;font-size:19px}
+.btn{background:var(--grad);color:#fff;border:0;border-radius:14px;padding:14px;font-size:16px;font-weight:700;width:100%}
+.btn.ghost{background:var(--card2);border:1px solid var(--line);color:var(--text)}
+.btn.danger{background:#2a1020;color:#ff7a95;border:1px solid #4a1d33}
+.btn:disabled{opacity:.5}
+.hint{color:var(--muted);font-size:13px}
+#wheelWrap{position:relative;width:min(88vw,380px);aspect-ratio:1;margin:8px auto}
+#wheel{width:100%;height:100%}
+#pointer{position:absolute;top:-6px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:13px solid transparent;border-right:13px solid transparent;border-top:26px solid #fff;filter:drop-shadow(0 2px 6px rgba(155,107,255,.9));z-index:2}
+#spinBtn{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:78px;height:78px;border-radius:50%;border:4px solid #000;background:var(--grad);color:#fff;font-weight:800;font-size:15px;z-index:3}
+#winner{text-align:center;margin-top:10px;min-height:96px}
+#winner .w{font-size:26px;font-weight:800;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+#winner .a{color:var(--muted);font-size:14px;margin:4px 0 12px}
+#winner .acts{display:flex;gap:8px;justify-content:center}
+#winner .acts a,#winner .acts button{background:var(--card2);border:1px solid var(--line);color:var(--text);padding:10px 14px;border-radius:12px;font-size:14px;font-weight:600;text-decoration:none}
+details{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:10px}
+summary{font-weight:700;cursor:pointer}
+details p,details li{color:var(--muted);font-size:14px;line-height:1.5}
+.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:#0d0d1a;color:#f2f2ff;border:1px solid #25254a}
+.leaflet-popup-content{margin:12px 14px;font-size:14px}
+.leaflet-container a{color:#9b6bff}
+.leaflet-control-attribution{background:rgba(0,0,0,.6)!important;color:#8c8cb3!important}
+.leaflet-control-attribution a{color:#8c8cb3!important}
+</style>
+</head>
+<body>
+<header><h1>Where to Eat</h1><span id="sync">connecting…</span></header>
+<main>
+  <section id="tab-list" class="tab on">
+    <div class="filters" id="filtersList"></div>
+    <div class="count" id="countList"></div>
+    <div id="list"></div>
+  </section>
+  <section id="tab-map" class="tab"><div id="map"></div></section>
+  <section id="tab-spin" class="tab">
+    <div class="filters" id="filtersSpin"></div>
+    <div class="count" id="countSpin" style="text-align:center"></div>
+    <div id="wheelWrap"><div id="pointer"></div><canvas id="wheel" width="760" height="760"></canvas><button id="spinBtn">SPIN</button></div>
+    <div id="winner"></div>
+  </section>
+  <section id="tab-help" class="tab">
+    <details open><summary>How to use</summary>
+      <ol><li>Tap the + button to add a place.</li><li>Tap the circle when you have been.</li><li>Give stars and say if you would go back.</li><li>Use Spin to let the wheel decide.</li></ol>
+    </details>
+    <details><summary>More details</summary>
+      <p>Both of you see the same list and changes show up live. The Spin tab uses whatever filters are set, so leave it on "Not been" to pick somewhere new.</p>
+      <p>The map pins come from the address you type. Purple pins are places you have not been, blue pins are places you have. If a pin is missing, edit the place and make the address more complete.</p>
+      <p>On iPhone, open the site in Safari, tap Share, then "Add to Home Screen".</p>
+    </details>
+  </section>
+</main>
+
+<button class="fab" id="fab" aria-label="Add place">+</button>
+
+<nav>
+  <button data-tab="list" class="on"><svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>List</button>
+  <button data-tab="map"><svg viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11a7 7 0 0114 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>Map</button>
+  <button data-tab="spin"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3v9l6.4 6.4M12 12L5.6 18.4"/></svg>Spin</button>
+  <button data-tab="help"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 115 0c0 1.7-2.5 2-2.5 4M12 17h.01"/></svg>Help</button>
+</nav>
+
+<div class="sheet-bg" id="sheetBg"><div class="sheet" id="sheet"></div></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+/* ================= SETTINGS =================
+   Paste your Firebase web config below (see README).
+   LIST_CODE is the private "room name" for your list: change it to any long
+   random word so nobody else lands in your list. */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBWzATLrbDkh2JxsyOtKiVF_2-hQHUY1KI",
+  authDomain: "where-to-eat-70157.firebaseapp.com",
+  projectId: "where-to-eat-70157",
+  appId: "1:367195256599:web:9681560ce232cff83f6952"
+};
+const LIST_CODE = "eat-b0ae63bcf9083e11";
+const START_VIEW = [27.95, -82.46]; // Tampa; map re-centers on your places
+/* ============================================ */
+
+const $ = (s, r = document) => r.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+
+/* ---------- data store (Firebase, or local fallback) ---------- */
+let places = [];
+const useFirebase = !FIREBASE_CONFIG.apiKey.startsWith("PASTE");
+let store;
+if (useFirebase) {
+  firebase.initializeApp(FIREBASE_CONFIG);
+  const col = firebase.firestore().collection("lists").doc(LIST_CODE).collection("places");
+  store = {
+    start(cb) {
+      col.onSnapshot(s => { cb(s.docs.map(d => ({ id: d.id, ...d.data() }))); setSync("live"); },
+        e => { console.error(e); setSync("offline"); });
+    },
+    add: p => col.add({ ...p, createdAt: Date.now() }),
+    update: (id, p) => col.doc(id).update(p),
+    remove: id => col.doc(id).delete()
+  };
+} else {
+  const KEY = "wte-local";
+  const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch { return []; } };
+  const save = a => { try { localStorage.setItem(KEY, JSON.stringify(a)); } catch {} };
+  let cbk;
+  store = {
+    start(cb) { cbk = cb; cb(load()); setSync("this phone only"); },
+    add: p => { const a = load(); a.push({ ...p, id: "l" + Date.now(), createdAt: Date.now() }); save(a); cbk(a); },
+    update: (id, p) => { const a = load().map(x => x.id === id ? { ...x, ...p } : x); save(a); cbk(a); },
+    remove: id => { const a = load().filter(x => x.id !== id); save(a); cbk(a); }
+  };
+}
+function setSync(t) { $("#sync").textContent = t === "live" ? "● live" : t; }
+
+/* ---------- filters (shared by List and Spin) ---------- */
+const filter = { status: "new", area: "" };
+const STATUSES = [["all","All"],["new","Not been"],["been","Been"],["back","Go back"]];
+
+function applyFilter(arr) {
+  return arr.filter(p => {
+    if (filter.status === "new" && p.visited) return false;
+    if (filter.status === "been" && !p.visited) return false;
+    if (filter.status === "back" && !(p.visited && p.goBack === "yes")) return false;
+    if (filter.area && p.area !== filter.area) return false;
+    return true;
+  });
+}
+function renderFilters() {
+  const areas = [...new Set(places.map(p => p.area).filter(Boolean))].sort();
+  if (filter.area && !areas.includes(filter.area)) filter.area = "";
+  ["#filtersList", "#filtersSpin"].forEach(sel => {
+    const box = $(sel);
+    box.innerHTML = `<div class="seg">${STATUSES.map(([k, l]) => `<button data-s="${k}" class="${filter.status === k ? "on" : ""}">${l}</button>`).join("")}</div>
+      <select aria-label="Location"><option value="">All locations</option>${areas.map(a => `<option ${filter.area === a ? "selected" : ""}>${esc(a)}</option>`).join("")}</select>`;
+    box.querySelectorAll("button").forEach(b => b.onclick = () => { filter.status = b.dataset.s; renderAll(); });
+    box.querySelector("select").onchange = e => { filter.area = e.target.value; renderAll(); };
+  });
+}
+
+/* ---------- list ---------- */
+function stars(p) {
+  return [1,2,3,4,5].map(n => `<button data-act="star" data-n="${n}" class="${(p.rating || 0) >= n ? "on" : ""}" aria-label="${n} stars">★</button>`).join("");
+}
+function renderList() {
+  const arr = applyFilter(places).sort((a, b) => (a.visited - b.visited) || (b.createdAt - a.createdAt));
+  $("#countList").textContent = `${arr.length} of ${places.length} places`;
+  const box = $("#list");
+  if (!arr.length) { box.innerHTML = `<div class="empty">${places.length ? "Nothing matches these filters." : "No places yet. Tap + to add your first one."}</div>`; return; }
+  box.innerHTML = arr.map(p => `
+    <div class="item ${p.visited ? "done" : ""}" data-id="${p.id}">
+      <div class="row">
+        <button class="chk ${p.visited ? "on" : ""}" data-act="visit" aria-label="We went">${p.visited ? "✓" : ""}</button>
+        <div class="info">
+          <div class="name">${esc(p.name)}</div>
+          <a class="addr" href="https://maps.apple.com/?q=${encodeURIComponent(p.name + " " + p.address)}" target="_blank" rel="noopener">${esc(p.address)}</a>
+          ${p.area ? `<span class="chip">${esc(p.area)}</span>` : ""}
+        </div>
+        <button class="more" data-act="edit" aria-label="Edit">⋯</button>
+      </div>
+      ${p.visited ? `<div class="rate"><div class="stars">${stars(p)}</div>
+        <div class="back"><button class="yes ${p.goBack === "yes" ? "on" : ""}" data-act="back" data-v="yes">Go back</button><button class="no ${p.goBack === "no" ? "on" : ""}" data-act="back" data-v="no">Skip</button></div></div>` : ""}
+    </div>`).join("");
+}
+$("#list").addEventListener("click", e => {
+  const b = e.target.closest("[data-act]"); if (!b) return;
+  const id = b.closest(".item").dataset.id, p = places.find(x => x.id === id); if (!p) return;
+  const a = b.dataset.act;
+  if (a === "visit") store.update(id, { visited: !p.visited, visitedAt: !p.visited ? Date.now() : null });
+  else if (a === "star") store.update(id, { rating: p.rating === +b.dataset.n ? 0 : +b.dataset.n });
+  else if (a === "back") store.update(id, { goBack: p.goBack === b.dataset.v ? null : b.dataset.v });
+  else if (a === "edit") openEdit(p);
+});
+
+/* ---------- add / edit sheets ---------- */
+const sheetBg = $("#sheetBg"), sheet = $("#sheet");
+function closeSheet() { sheetBg.classList.remove("on"); }
+sheetBg.addEventListener("click", e => { if (e.target === sheetBg) closeSheet(); });
+
+async function geocode(q) {
+  try {
+    const r = await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&addressdetails=1&q=" + encodeURIComponent(q));
+    const j = await r.json();
+    if (!j.length) return null;
+    const a = j[0].address || {};
+    return { lat: +j[0].lat, lng: +j[0].lon, area: a.city || a.town || a.village || a.hamlet || a.suburb || a.county || "" };
+  } catch { return null; }
+}
+function formSheet(title, p, onSave, onDelete) {
+  sheet.innerHTML = `<h2>${title}</h2>
+    <input id="fName" placeholder="Restaurant name" value="${esc(p.name || "")}" autocomplete="off">
+    <input id="fAddr" placeholder="Address (street, city)" value="${esc(p.address || "")}" autocomplete="off">
+    <div class="hint" id="fMsg">Add the city so the map pin lands in the right place.</div>
+    <button class="btn" id="fSave">Save</button>
+    ${onDelete ? `<button class="btn danger" id="fDel">Delete place</button>` : ""}
+    <button class="btn ghost" id="fCancel">Cancel</button>`;
+  sheetBg.classList.add("on");
+  $("#fCancel").onclick = closeSheet;
+  if (onDelete) $("#fDel").onclick = () => { if (confirm("Delete this place?")) { onDelete(); closeSheet(); } };
+  $("#fSave").onclick = async () => {
+    const name = $("#fName").value.trim(), address = $("#fAddr").value.trim();
+    if (!name) { $("#fMsg").textContent = "Please enter a name."; return; }
+    const btn = $("#fSave"); btn.disabled = true; btn.textContent = "Finding on the map…";
+    let geo = null;
+    if (address && (address !== p.address || p.lat == null)) geo = (await geocode(address)) || (await geocode(name + " " + address));
+    const data = { name, address };
+    if (geo) Object.assign(data, geo);
+    else if (address !== p.address) { data.lat = null; data.lng = null; }
+    await onSave(data, !!geo || !address);
+    closeSheet();
+  };
+}
+function openAdd() {
+  formSheet("Add a place", {}, async (d, found) => {
+    await store.add({ ...d, visited: false, rating: 0, goBack: null, area: d.area || "" });
+    if (!found) alert("Saved, but I could not find that address on the map. Edit it to add more detail.");
+  });
+  setTimeout(() => $("#fName").focus(), 50);
+}
+function openEdit(p) {
+  formSheet("Edit place", p, d => store.update(p.id, d), () => store.remove(p.id));
+}
+$("#fab").onclick = openAdd;
+
+/* ---------- map ---------- */
+let map, layer;
+function initMap() {
+  map = L.map("map", { zoomControl: false }).setView(START_VIEW, 11);
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+    attribution: "© OpenStreetMap © CARTO", maxZoom: 19
+  }).addTo(map);
+  layer = L.layerGroup().addTo(map);
+}
+function renderMap(fit) {
+  if (!map) return;
+  layer.clearLayers();
+  const pts = [];
+  places.filter(p => p.lat != null && p.lng != null).forEach(p => {
+    const c = p.visited ? "#4c8dff" : "#9b6bff";
+    const m = L.circleMarker([p.lat, p.lng], { radius: 11, color: "#fff", weight: 2, fillColor: c, fillOpacity: 1 }).addTo(layer);
+    m.bindPopup(`<b>${esc(p.name)}</b><br>${esc(p.address)}<br>${p.visited ? "★".repeat(p.rating || 0) + (p.rating ? " " : "") + "Been" + (p.goBack === "yes" ? " · go back" : p.goBack === "no" ? " · skip" : "") : "Not been yet"}<br><a href="https://maps.apple.com/?q=${encodeURIComponent(p.name + " " + p.address)}" target="_blank" rel="noopener">Directions</a>`);
+    pts.push([p.lat, p.lng]);
+  });
+  if (fit && pts.length) map.fitBounds(pts, { padding: [50, 50], maxZoom: 14 });
+}
+
+/* ---------- wheel ---------- */
+const COLORS = ["#4c8dff", "#9b6bff", "#2f5fd0", "#7a4ee0", "#6aa3ff", "#b48bff"];
+let rot = 0, spinning = false, wheelItems = [];
+function drawWheel() {
+  const cv = $("#wheel"), ctx = cv.getContext("2d"), W = cv.width, R = W / 2 - 8, n = wheelItems.length;
+  ctx.clearRect(0, 0, W, W);
+  ctx.save(); ctx.translate(W / 2, W / 2);
+  if (!n) {
+    ctx.beginPath(); ctx.arc(0, 0, R, 0, 7); ctx.fillStyle = "#0d0d1a"; ctx.fill();
+    ctx.strokeStyle = "#25254a"; ctx.lineWidth = 6; ctx.stroke();
+    ctx.fillStyle = "#8c8cb3"; ctx.font = "600 34px -apple-system,sans-serif"; ctx.textAlign = "center";
+    ctx.fillText("Add places to spin", 0, 10); ctx.restore(); return;
+  }
+  ctx.rotate(rot);
+  const seg = Math.PI * 2 / n;
+  wheelItems.forEach((p, i) => {
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, R, i * seg, (i + 1) * seg); ctx.closePath();
+    ctx.fillStyle = COLORS[i % COLORS.length]; ctx.fill();
+    ctx.strokeStyle = "#000"; ctx.lineWidth = 3; ctx.stroke();
+    ctx.save(); ctx.rotate(i * seg + seg / 2); ctx.textAlign = "right"; ctx.fillStyle = "#fff";
+    const fs = n > 14 ? 24 : n > 8 ? 30 : 36; ctx.font = `700 ${fs}px -apple-system,sans-serif`;
+    let t = p.name; const max = 17; if (t.length > max) t = t.slice(0, max - 1) + "…";
+    ctx.fillText(t, R - 28, fs / 3); ctx.restore();
+  });
+  ctx.restore();
+}
+function renderSpin() {
+  if (spinning) return;
+  wheelItems = applyFilter(places);
+  $("#countSpin").textContent = wheelItems.length ? `${wheelItems.length} on the wheel` : "";
+  $("#winner").innerHTML = "";
+  drawWheel();
+}
+$("#spinBtn").onclick = () => {
+  if (spinning || !wheelItems.length) return;
+  spinning = true; $("#winner").innerHTML = "";
+  const n = wheelItems.length, seg = Math.PI * 2 / n;
+  const pick = Math.floor(Math.random() * n);
+  // pointer is at top (-90deg); land on a random spot inside the picked slice
+  const within = (0.15 + Math.random() * 0.7) * seg;
+  const target = (-Math.PI / 2 - (pick * seg + within)) ;
+  const start = rot, turns = 5 + Math.floor(Math.random() * 3);
+  let delta = ((target - start) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) + turns * Math.PI * 2;
+  const dur = 4800, t0 = performance.now();
+  (function frame(t) {
+    const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 4);
+    rot = start + delta * e; drawWheel();
+    if (k < 1) requestAnimationFrame(frame);
+    else { spinning = false; showWinner(wheelItems[pick]); }
+  })(t0);
+};
+function showWinner(p) {
+  if (navigator.vibrate) navigator.vibrate(60);
+  $("#winner").innerHTML = `<div class="w">${esc(p.name)}</div><div class="a">${esc(p.address)}</div>
+    <div class="acts"><a href="https://maps.apple.com/?q=${encodeURIComponent(p.name + " " + p.address)}" target="_blank" rel="noopener">Directions</a>
+    <button id="wGo">We went</button><button id="wAgain">Spin again</button></div>`;
+  $("#wAgain").onclick = () => $("#spinBtn").click();
+  $("#wGo").onclick = () => { store.update(p.id, { visited: true, visitedAt: Date.now() }); };
+}
+
+/* ---------- tabs & boot ---------- */
+function showTab(t) {
+  document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x.id === "tab-" + t));
+  document.querySelectorAll("nav button").forEach(x => x.classList.toggle("on", x.dataset.tab === t));
+  $("#fab").style.display = (t === "list" || t === "map") ? "" : "none";
+  if (t === "map") { if (!map) initMap(); setTimeout(() => { map.invalidateSize(); renderMap(true); }, 30); }
+  if (t === "spin") renderSpin();
+}
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => showTab(b.dataset.tab));
+
+function renderAll() {
+  renderFilters(); renderList();
+  if ($("#tab-spin").classList.contains("on")) renderSpin();
+  if (map && $("#tab-map").classList.contains("on")) renderMap(false);
+}
+store.start(arr => { places = arr; renderAll(); });
+</script>
+</body>
+</html>
