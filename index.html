@@ -78,11 +78,15 @@ select:focus,input:focus{outline:2px solid var(--purple)}
 #winner{text-align:center;margin-top:10px;min-height:96px}
 #winner .w{font-size:26px;font-weight:800;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
 #winner .a{color:var(--muted);font-size:14px;margin:4px 0 12px}
-#winner .acts{display:flex;gap:8px;justify-content:center}
+#winner .acts{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
 #winner .acts a,#winner .acts button{background:var(--card2);border:1px solid var(--line);color:var(--text);padding:10px 14px;border-radius:12px;font-size:14px;font-weight:600;text-decoration:none}
 details{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:10px}
 summary{font-weight:700;cursor:pointer}
 details p,details li{color:var(--muted);font-size:14px;line-height:1.5}
+.leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.9) contrast(.95)}
+.links{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.links a{font-size:13px;font-weight:600;color:#fff!important;text-decoration:none;background:var(--card2);border:1px solid var(--line);padding:6px 12px;border-radius:99px}
+.links a.menu{background:var(--grad);border-color:transparent}
 .leaflet-popup-content-wrapper,.leaflet-popup-tip{background:#0d0d1a;color:#f2f2ff;border:1px solid #25254a}
 .leaflet-popup-content{margin:12px 14px;font-size:14px}
 .leaflet-container a{color:#9b6bff}
@@ -148,6 +152,10 @@ const START_VIEW = [27.95, -82.46]; // Tampa; map re-centers on your places
 
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+
+const dirUrl = p => "https://maps.apple.com/?q=" + encodeURIComponent(p.name + " " + p.address);
+const menuUrl = p => p.link || "https://www.google.com/search?q=" + encodeURIComponent(p.name + " " + (p.area || p.address) + " menu");
+const linksHtml = p => `<div class="links"><a class="menu" href="${esc(menuUrl(p))}" target="_blank" rel="noopener">${p.link ? "Menu / Website" : "Find menu"}</a><a href="${esc(dirUrl(p))}" target="_blank" rel="noopener">Directions</a></div>`;
 
 /* ---------- data store (Firebase, or local fallback) ---------- */
 let places = [];
@@ -221,6 +229,7 @@ function renderList() {
           <div class="name">${esc(p.name)}</div>
           <a class="addr" href="https://maps.apple.com/?q=${encodeURIComponent(p.name + " " + p.address)}" target="_blank" rel="noopener">${esc(p.address)}</a>
           ${p.area ? `<span class="chip">${esc(p.area)}</span>` : ""}
+          ${linksHtml(p)}
         </div>
         <button class="more" data-act="edit" aria-label="Edit">⋯</button>
       </div>
@@ -256,6 +265,7 @@ function formSheet(title, p, onSave, onDelete) {
   sheet.innerHTML = `<h2>${title}</h2>
     <input id="fName" placeholder="Restaurant name" value="${esc(p.name || "")}" autocomplete="off">
     <input id="fAddr" placeholder="Address (street, city)" value="${esc(p.address || "")}" autocomplete="off">
+    <input id="fLink" placeholder="Menu or website link (optional)" value="${esc(p.link || "")}" autocomplete="off" inputmode="url">
     <div class="hint" id="fMsg">Add the city so the map pin lands in the right place.</div>
     <button class="btn" id="fSave">Save</button>
     ${onDelete ? `<button class="btn danger" id="fDel">Delete place</button>` : ""}
@@ -269,7 +279,8 @@ function formSheet(title, p, onSave, onDelete) {
     const btn = $("#fSave"); btn.disabled = true; btn.textContent = "Finding on the map…";
     let geo = null;
     if (address && (address !== p.address || p.lat == null)) geo = (await geocode(address)) || (await geocode(name + " " + address));
-    const data = { name, address };
+    let link = $("#fLink").value.trim(); if (link && !/^https?:\/\//i.test(link)) link = "https://" + link;
+    const data = { name, address, link };
     if (geo) Object.assign(data, geo);
     else if (address !== p.address) { data.lat = null; data.lng = null; }
     await onSave(data, !!geo || !address);
@@ -292,8 +303,8 @@ $("#fab").onclick = openAdd;
 let map, layer;
 function initMap() {
   map = L.map("map", { zoomControl: false }).setView(START_VIEW, 11);
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-    attribution: "© OpenStreetMap © CARTO", maxZoom: 19
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: "© OpenStreetMap contributors", maxZoom: 19
   }).addTo(map);
   layer = L.layerGroup().addTo(map);
 }
@@ -304,7 +315,7 @@ function renderMap(fit) {
   places.filter(p => p.lat != null && p.lng != null).forEach(p => {
     const c = p.visited ? "#4c8dff" : "#9b6bff";
     const m = L.circleMarker([p.lat, p.lng], { radius: 11, color: "#fff", weight: 2, fillColor: c, fillOpacity: 1 }).addTo(layer);
-    m.bindPopup(`<b>${esc(p.name)}</b><br>${esc(p.address)}<br>${p.visited ? "★".repeat(p.rating || 0) + (p.rating ? " " : "") + "Been" + (p.goBack === "yes" ? " · go back" : p.goBack === "no" ? " · skip" : "") : "Not been yet"}<br><a href="https://maps.apple.com/?q=${encodeURIComponent(p.name + " " + p.address)}" target="_blank" rel="noopener">Directions</a>`);
+    m.bindPopup(`<b>${esc(p.name)}</b><br>${esc(p.address)}<br>${p.visited ? "★".repeat(p.rating || 0) + (p.rating ? " " : "") + "Been" + (p.goBack === "yes" ? " · go back" : p.goBack === "no" ? " · skip" : "") : "Not been yet"}${linksHtml(p)}`);
     pts.push([p.lat, p.lng]);
   });
   if (fit && pts.length) map.fitBounds(pts, { padding: [50, 50], maxZoom: 14 });
@@ -364,7 +375,7 @@ $("#spinBtn").onclick = () => {
 function showWinner(p) {
   if (navigator.vibrate) navigator.vibrate(60);
   $("#winner").innerHTML = `<div class="w">${esc(p.name)}</div><div class="a">${esc(p.address)}</div>
-    <div class="acts"><a href="https://maps.apple.com/?q=${encodeURIComponent(p.name + " " + p.address)}" target="_blank" rel="noopener">Directions</a>
+    <div class="acts"><a href="${esc(menuUrl(p))}" target="_blank" rel="noopener">Menu</a><a href="${esc(dirUrl(p))}" target="_blank" rel="noopener">Directions</a>
     <button id="wGo">We went</button><button id="wAgain">Spin again</button></div>`;
   $("#wAgain").onclick = () => $("#spinBtn").click();
   $("#wGo").onclick = () => { store.update(p.id, { visited: true, visitedAt: Date.now() }); };
