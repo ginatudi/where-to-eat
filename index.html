@@ -101,6 +101,20 @@ details p,details li{color:var(--muted);font-size:14px;line-height:1.5}
 #list.compact .links{display:none}
 .countrow{display:flex;align-items:center;justify-content:space-between}
 .tog{background:var(--card);border:1px solid var(--line);color:var(--muted);font-size:12px;font-weight:600;padding:5px 12px;border-radius:99px}
+nav button{position:relative}
+.ndot{display:none;position:absolute;top:6px;right:26%;width:9px;height:9px;border-radius:50%;background:var(--purple);border:2px solid #000}
+.ndot.on{display:block}
+.week{background:var(--card);border:1px solid #2b3a78;border-radius:16px;padding:12px 14px;margin:6px 0 12px}
+.week b{font-size:17px;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.week div{color:var(--muted);font-size:13px;margin-top:4px}
+.sumrow{display:flex;gap:8px;margin:10px 0 12px}
+.sumrow div{flex:1;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 6px;text-align:center;color:var(--muted);font-size:12px}
+.sumrow b{display:block;font-size:22px;color:var(--text)}
+.feed{display:flex;gap:10px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--line);font-size:15px}
+.feed .k{flex:none;width:10px;height:10px;border-radius:50%;margin-top:6px;background:var(--blue)}
+.feed .k.plan{background:var(--purple)}
+.feed .k.went{background:#fff}
+.feed small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
 .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.9) contrast(.95)}
 .links{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
 .links a{font-size:13px;font-weight:600;color:#fff!important;text-decoration:none;background:var(--card2);border:1px solid var(--line);padding:6px 12px;border-radius:99px}
@@ -128,7 +142,11 @@ details p,details li{color:var(--muted);font-size:14px;line-height:1.5}
     <div id="winner"></div>
   </section>
   <section id="tab-plans" class="tab">
-    <div id="calHead"></div><div id="calGrid"></div><div id="calList"></div>
+    <div id="weekBox"></div><div id="calHead"></div><div id="calGrid"></div><div id="calList"></div>
+  </section>
+  <section id="tab-activity" class="tab">
+    <input id="myName" placeholder="Your name (so the other person sees who did what)" autocomplete="off">
+    <div id="actBody"></div>
   </section>
   <section id="tab-help" class="tab">
     <details open><summary>How to use</summary>
@@ -149,6 +167,7 @@ details p,details li{color:var(--muted);font-size:14px;line-height:1.5}
   <button data-tab="map"><svg viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11a7 7 0 0114 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>Map</button>
   <button data-tab="spin"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3v9l6.4 6.4M12 12L5.6 18.4"/></svg>Spin</button>
   <button data-tab="plans"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Plans</button>
+  <button data-tab="activity"><span class="ndot" id="ndot"></span><svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>Activity</button>
   <button data-tab="help"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 115 0c0 1.7-2.5 2-2.5 4M12 17h.01"/></svg>Help</button>
 </nav>
 
@@ -253,7 +272,6 @@ function renderList() {
           <a class="addr" href="https://maps.apple.com/?q=${encodeURIComponent(p.name + " " + p.address)}" target="_blank" rel="noopener">${esc(p.address)}</a>
           ${p.area ? `<span class="chip">${esc(p.area)}</span>` : ""}${p.price ? `<span class="chip">${"$".repeat(p.price)}</span>` : ""}${p.want ? `<span class="chip">Want ${p.want}/5</span>` : ""}${p.planDate && !p.visited ? `<span class="chip plan">${esc(fmtDate(p))}</span>` : ""}
           ${linksHtml(p)}
-          ${p.planDate && !p.visited ? `<div class="links"><a class="menu" href="${icsUrl(p)}" target="_blank" rel="noopener">Add to calendar</a></div>` : ""}
         </div>
         <button class="more" data-act="edit" aria-label="Edit">⋯</button>
       </div>
@@ -265,7 +283,7 @@ $("#list").addEventListener("click", e => {
   const b = e.target.closest("[data-act]"); if (!b) return;
   const id = b.closest(".item").dataset.id, p = places.find(x => x.id === id); if (!p) return;
   const a = b.dataset.act;
-  if (a === "visit") store.update(id, { visited: !p.visited, visitedAt: !p.visited ? Date.now() : null });
+  if (a === "visit") store.update(id, { visited: !p.visited, visitedAt: !p.visited ? Date.now() : null, visitedBy: me() });
   else if (a === "star") store.update(id, { rating: p.rating === +b.dataset.n ? 0 : +b.dataset.n });
   else if (a === "back") store.update(id, { goBack: p.goBack === b.dataset.v ? null : b.dataset.v });
   else if (a === "edit") openEdit(p);
@@ -318,13 +336,13 @@ function formSheet(title, p, onSave, onDelete) {
 }
 function openAdd() {
   formSheet("Add a place", {}, async (d, found) => {
-    await store.add({ ...d, visited: false, rating: 0, goBack: null, area: d.area || "" });
+    await store.add({ ...d, visited: false, rating: 0, goBack: null, area: d.area || "", addedBy: me(), ...(d.planDate ? { planSetAt: Date.now(), planBy: me() } : {}) });
     if (!found) alert("Saved, but I could not find that address on the map. Edit it to add more detail.");
   });
   setTimeout(() => $("#fName").focus(), 50);
 }
 function openEdit(p) {
-  formSheet("Edit place", p, d => store.update(p.id, d), () => store.remove(p.id));
+  formSheet("Edit place", p, d => store.update(p.id, d.planDate && d.planDate !== (p.planDate || "") ? { ...d, planSetAt: Date.now(), planBy: me() } : d), () => store.remove(p.id));
 }
 $("#fab").onclick = openAdd;
 
@@ -408,7 +426,7 @@ function showWinner(p) {
     <button id="wGo">We went</button><button id="wPlan">Plan it</button><button id="wAgain">Spin again</button></div>`;
   $("#wAgain").onclick = () => $("#spinBtn").click();
   $("#wPlan").onclick = () => openEdit(p);
-  $("#wGo").onclick = () => { store.update(p.id, { visited: true, visitedAt: Date.now() }); };
+  $("#wGo").onclick = () => { store.update(p.id, { visited: true, visitedAt: Date.now(), visitedBy: me() }); };
 }
 
 /* ---------- plans / calendar ---------- */
@@ -421,24 +439,22 @@ const fmtDate = p => {
   const [y, m, d] = p.planDate.split("-").map(Number);
   return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }) + (p.planTime ? " " + fmtTime(p.planTime) : "");
 };
-const ic = s => String(s || "").replace(/([,;\\])/g, "\\$1");
-const icsText = p => {
-  const d = p.planDate.replace(/-/g, ""), t = (p.planTime || "19:00").replace(":", "") + "00";
-  const ics = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//WhereToEat//EN", "BEGIN:VEVENT", "UID:" + p.id + "@where-to-eat",
-    "DTSTAMP:" + new Date().toISOString().replace(/[-:]/g, "").slice(0, 15) + "Z", "DTSTART:" + d + "T" + t, "DURATION:PT1H30M",
-    "SUMMARY:" + ic("Dinner at " + p.name), "LOCATION:" + ic(p.address), "END:VEVENT", "END:VCALENDAR"].join("\r\n");
-  return ics;
-};
-const icsUrl = p => "data:text/calendar;charset=utf-8," + encodeURIComponent(icsText(p));
 const eventCard = (p, today) => `<div class="item" data-id="${p.id}">
   <div class="name">${esc(p.name)}</div>
   <div class="addr">${esc(fmtDate(p))}${p.planDate < today && !p.visited ? " · did you go?" : ""}${p.visited ? " · went" : ""}</div>
   <div class="addr">${esc(p.address)}</div>
-  <div class="links"><a class="menu" href="${esc(menuUrl(p))}" target="_blank" rel="noopener">Menu</a><a href="${esc(dirUrl(p))}" target="_blank" rel="noopener">Directions</a><a class="menu" href="${icsUrl(p)}" target="_blank" rel="noopener">Add to calendar</a></div>
+  <div class="links"><a class="menu" href="${esc(menuUrl(p))}" target="_blank" rel="noopener">Menu</a><a href="${esc(dirUrl(p))}" target="_blank" rel="noopener">Directions</a></div>
   <div class="links">${p.visited ? "" : `<button data-act="went">We went</button>`}<button data-act="edit">Edit</button><button data-act="clear">Clear date</button></div>
 </div>`;
 function renderPlans() {
   const today = ymd(new Date());
+  const nowD = new Date(), ws = new Date(nowD.getFullYear(), nowD.getMonth(), nowD.getDate() - nowD.getDay());
+  const we = new Date(ws.getFullYear(), ws.getMonth(), ws.getDate() + 6);
+  const wk = places.filter(p => p.planDate && p.planDate >= ymd(ws) && p.planDate <= ymd(we))
+    .sort((a, b) => (a.planDate + (a.planTime || "")).localeCompare(b.planDate + (b.planTime || "")));
+  $("#weekBox").innerHTML = `<div class="week"><b>This week: ${wk.length} planned</b>` +
+    (wk.length ? wk.map(p => `<div>${esc(fmtDate(p))} · ${esc(p.name)}${p.visited ? " (went)" : ""}</div>`).join("")
+      : `<div>Nothing planned yet. Pick a night and tap a place's menu dots to set a date.</div>`) + `</div>`;
   const byDay = {};
   places.filter(p => p.planDate).forEach(p => (byDay[p.planDate] = byDay[p.planDate] || []).push(p));
   const y = calMonth.getFullYear(), m = calMonth.getMonth();
@@ -465,10 +481,46 @@ $("#tab-plans").addEventListener("click", e => {
   if (day) { calSel = calSel === day.dataset.d ? "" : day.dataset.d; renderPlans(); return; }
   const b = e.target.closest("[data-act]"); if (!b) return;
   const p = places.find(x => x.id === b.closest(".item").dataset.id); if (!p) return;
-  if (b.dataset.act === "went") store.update(p.id, { visited: true, visitedAt: Date.now() });
+  if (b.dataset.act === "went") store.update(p.id, { visited: true, visitedAt: Date.now(), visitedBy: me() });
   else if (b.dataset.act === "edit") openEdit(p);
   else if (b.dataset.act === "clear") store.update(p.id, { planDate: "", planTime: "" });
 });
+
+/* ---------- activity ---------- */
+let myName = "";
+try { myName = localStorage.getItem("wte-name") || ""; } catch {}
+const me = () => myName;
+const relTime = ts => {
+  const m = Math.round((Date.now() - ts) / 60000);
+  if (m < 1) return "just now"; if (m < 60) return m + " min ago";
+  const h = Math.round(m / 60); if (h < 24) return h + (h === 1 ? " hour ago" : " hours ago");
+  const d = Math.round(h / 24); return d === 1 ? "yesterday" : d + " days ago";
+};
+function activityItems() {
+  const items = [];
+  places.forEach(p => {
+    if (p.createdAt) items.push({ ts: p.createdAt, who: p.addedBy, k: "add", text: `added <b>${esc(p.name)}</b>` });
+    if (p.planSetAt && p.planDate) items.push({ ts: p.planSetAt, who: p.planBy, k: "plan", text: `planned <b>${esc(p.name)}</b> for ${esc(fmtDate(p))}` });
+    if (p.visited && p.visitedAt) items.push({ ts: p.visitedAt, who: p.visitedBy, k: "went", text: `went to <b>${esc(p.name)}</b>` });
+  });
+  return items.sort((a, b) => b.ts - a.ts);
+}
+const getSeen = () => { try { return +localStorage.getItem("wte-seen") || 0; } catch { return 0; } };
+const markSeen = () => { try { localStorage.setItem("wte-seen", String(Date.now())); } catch {} updateDot(); };
+function updateDot() {
+  const seen = getSeen();
+  const unseen = activityItems().some(i => i.ts > seen && !(i.who && i.who === me()));
+  $("#ndot").classList.toggle("on", unseen && !$("#tab-activity").classList.contains("on"));
+}
+function renderActivity() {
+  const items = activityItems(), wkAgo = Date.now() - 7 * 864e5;
+  const n = k => items.filter(i => i.k === k && i.ts > wkAgo).length;
+  $("#actBody").innerHTML = `<div class="sumrow"><div><b>${n("add")}</b>added this week</div><div><b>${n("plan")}</b>planned this week</div><div><b>${n("went")}</b>visited this week</div></div>` +
+    (items.length ? items.slice(0, 60).map(i => `<div class="feed"><span class="k ${i.k}"></span><div>${i.who ? esc(i.who) : "Someone"} ${i.text}<small>${relTime(i.ts)}</small></div></div>`).join("")
+      : `<div class="empty">Nothing yet. Add a place and it will show up here.</div>`);
+}
+$("#myName").value = myName;
+$("#myName").addEventListener("input", e => { myName = e.target.value.trim(); try { localStorage.setItem("wte-name", myName); } catch {} });
 
 /* ---------- tabs & boot ---------- */
 function showTab(t) {
@@ -478,6 +530,7 @@ function showTab(t) {
   if (t === "map") { if (!map) initMap(); setTimeout(() => { map.invalidateSize(); renderMap(true); }, 30); }
   if (t === "spin") renderSpin();
   if (t === "plans") renderPlans();
+  if (t === "activity") { renderActivity(); markSeen(); }
 }
 document.querySelectorAll("nav button").forEach(b => b.onclick = () => showTab(b.dataset.tab));
 
@@ -486,12 +539,14 @@ function renderAll() {
   if ($("#tab-spin").classList.contains("on")) renderSpin();
   if (map && $("#tab-map").classList.contains("on")) renderMap(false);
   if ($("#tab-plans").classList.contains("on")) renderPlans();
+  if ($("#tab-activity").classList.contains("on")) { renderActivity(); markSeen(); } else updateDot();
 }
 let compact = true;
 try { compact = localStorage.getItem("wte-compact") !== "0"; } catch {}
 function applyCompact() { $("#list").classList.toggle("compact", compact); $("#togBtns").textContent = compact ? "Show buttons" : "Hide buttons"; }
 $("#togBtns").onclick = () => { compact = !compact; try { localStorage.setItem("wte-compact", compact ? "1" : "0"); } catch {} applyCompact(); };
 applyCompact();
+try { if (!localStorage.getItem("wte-seen")) localStorage.setItem("wte-seen", String(Date.now())); } catch {}
 store.start(arr => { places = arr; renderAll(); });
 </script>
 </body>
