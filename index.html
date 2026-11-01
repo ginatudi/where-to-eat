@@ -250,6 +250,7 @@ function renderList() {
           <a class="addr" href="https://maps.apple.com/?q=${encodeURIComponent(p.name + " " + p.address)}" target="_blank" rel="noopener">${esc(p.address)}</a>
           ${p.area ? `<span class="chip">${esc(p.area)}</span>` : ""}${p.price ? `<span class="chip">${"$".repeat(p.price)}</span>` : ""}${p.want ? `<span class="chip">Want ${p.want}/5</span>` : ""}${p.planDate && !p.visited ? `<span class="chip plan">${esc(fmtDate(p))}</span>` : ""}
           ${linksHtml(p)}
+          ${p.planDate && !p.visited ? `<div class="links"><button data-act="ics">Add to calendar</button></div>` : ""}
         </div>
         <button class="more" data-act="edit" aria-label="Edit">⋯</button>
       </div>
@@ -265,6 +266,7 @@ $("#list").addEventListener("click", e => {
   else if (a === "star") store.update(id, { rating: p.rating === +b.dataset.n ? 0 : +b.dataset.n });
   else if (a === "back") store.update(id, { goBack: p.goBack === b.dataset.v ? null : b.dataset.v });
   else if (a === "edit") openEdit(p);
+  else if (a === "ics") addToCalendar(p);
 });
 
 /* ---------- add / edit sheets ---------- */
@@ -417,18 +419,27 @@ const fmtDate = p => {
   const [y, m, d] = p.planDate.split("-").map(Number);
   return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }) + (p.planTime ? " " + fmtTime(p.planTime) : "");
 };
-const icsUrl = p => {
+const ic = s => String(s || "").replace(/([,;\\])/g, "\\$1");
+const icsText = p => {
   const d = p.planDate.replace(/-/g, ""), t = (p.planTime || "19:00").replace(":", "") + "00";
   const ics = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//WhereToEat//EN", "BEGIN:VEVENT", "UID:" + p.id + "@where-to-eat",
     "DTSTAMP:" + new Date().toISOString().replace(/[-:]/g, "").slice(0, 15) + "Z", "DTSTART:" + d + "T" + t, "DURATION:PT1H30M",
-    "SUMMARY:Dinner at " + p.name, "LOCATION:" + (p.address || ""), "END:VEVENT", "END:VCALENDAR"].join("\r\n");
-  return "data:text/calendar;charset=utf-8," + encodeURIComponent(ics);
+    "SUMMARY:" + ic("Dinner at " + p.name), "LOCATION:" + ic(p.address), "END:VEVENT", "END:VCALENDAR"].join("\r\n");
+  return ics;
 };
+async function addToCalendar(p) {
+  const text = icsText(p), name = "dinner-" + p.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase() + ".ics";
+  try {
+    const f = new File([text], name, { type: "text/calendar" });
+    if (navigator.canShare && navigator.canShare({ files: [f] })) { await navigator.share({ files: [f], title: "Dinner at " + p.name }); return; }
+  } catch (e) { if (e && e.name === "AbortError") return; }
+  location.href = URL.createObjectURL(new Blob([text], { type: "text/calendar" }));
+}
 const eventCard = (p, today) => `<div class="item" data-id="${p.id}">
   <div class="name">${esc(p.name)}</div>
   <div class="addr">${esc(fmtDate(p))}${p.planDate < today && !p.visited ? " · did you go?" : ""}${p.visited ? " · went" : ""}</div>
   <div class="addr">${esc(p.address)}</div>
-  <div class="links"><a class="menu" href="${esc(menuUrl(p))}" target="_blank" rel="noopener">Menu</a><a href="${esc(dirUrl(p))}" target="_blank" rel="noopener">Directions</a><a href="${icsUrl(p)}" download="dinner.ics">Add to calendar</a></div>
+  <div class="links"><a class="menu" href="${esc(menuUrl(p))}" target="_blank" rel="noopener">Menu</a><a href="${esc(dirUrl(p))}" target="_blank" rel="noopener">Directions</a><button data-act="ics">Add to calendar</button></div>
   <div class="links">${p.visited ? "" : `<button data-act="went">We went</button>`}<button data-act="edit">Edit</button><button data-act="clear">Clear date</button></div>
 </div>`;
 function renderPlans() {
@@ -461,6 +472,7 @@ $("#tab-plans").addEventListener("click", e => {
   const p = places.find(x => x.id === b.closest(".item").dataset.id); if (!p) return;
   if (b.dataset.act === "went") store.update(p.id, { visited: true, visitedAt: Date.now() });
   else if (b.dataset.act === "edit") openEdit(p);
+  else if (b.dataset.act === "ics") addToCalendar(p);
   else if (b.dataset.act === "clear") store.update(p.id, { planDate: "", planTime: "" });
 });
 
