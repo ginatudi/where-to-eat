@@ -115,6 +115,8 @@ nav button{position:relative}
 .feed .k.plan{background:var(--purple)}
 .feed .k.went{background:#fff}
 .feed small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+.nbadge{display:none;position:absolute;top:5px;right:22%;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--grad);color:#fff;font-size:11px;font-weight:700;line-height:18px;text-align:center}
+.nbadge.on{display:block}
 .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.9) contrast(.95)}
 .links{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
 .links a{font-size:13px;font-weight:600;color:#fff!important;text-decoration:none;background:var(--card2);border:1px solid var(--line);padding:6px 12px;border-radius:99px}
@@ -166,7 +168,7 @@ nav button{position:relative}
   <button data-tab="list" class="on"><svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>List</button>
   <button data-tab="map"><svg viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11a7 7 0 0114 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>Map</button>
   <button data-tab="spin"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3v9l6.4 6.4M12 12L5.6 18.4"/></svg>Spin</button>
-  <button data-tab="plans"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Plans</button>
+  <button data-tab="plans"><span class="nbadge" id="nbadge"></span><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Plans</button>
   <button data-tab="activity"><span class="ndot" id="ndot"></span><svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>Activity</button>
   <button data-tab="help"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 115 0c0 1.7-2.5 2-2.5 4M12 17h.01"/></svg>Help</button>
 </nav>
@@ -260,7 +262,7 @@ function stars(p) {
 }
 function renderList() {
   const arr = applyFilter(places).sort((a, b) => (a.visited - b.visited) || ((b.want || 0) - (a.want || 0)) || (b.createdAt - a.createdAt));
-  $("#countList").textContent = `${arr.length} of ${places.length} places`;
+  { const w = thisWeekPlans().length; $("#countList").textContent = `${arr.length} of ${places.length} places` + (w ? ` · ${w} planned this week` : ""); }
   const box = $("#list");
   if (!arr.length) { box.innerHTML = `<div class="empty">${places.length ? "Nothing matches these filters." : "No places yet. Tap + to add your first one."}</div>`; return; }
   box.innerHTML = arr.map(p => `
@@ -439,6 +441,15 @@ const fmtDate = p => {
   const [y, m, d] = p.planDate.split("-").map(Number);
   return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }) + (p.planTime ? " " + fmtTime(p.planTime) : "");
 };
+function thisWeekPlans() {
+  const n = new Date(), ws = new Date(n.getFullYear(), n.getMonth(), n.getDate() - n.getDay());
+  const we = new Date(ws.getFullYear(), ws.getMonth(), ws.getDate() + 6);
+  return places.filter(p => p.planDate && !p.visited && p.planDate >= ymd(ws) && p.planDate <= ymd(we));
+}
+function updateWeekBadge() {
+  const c = thisWeekPlans().length;
+  $("#nbadge").textContent = c; $("#nbadge").classList.toggle("on", c > 0);
+}
 const eventCard = (p, today) => `<div class="item" data-id="${p.id}">
   <div class="name">${esc(p.name)}</div>
   <div class="addr">${esc(fmtDate(p))}${p.planDate < today && !p.visited ? " · did you go?" : ""}${p.visited ? " · went" : ""}</div>
@@ -535,7 +546,7 @@ function showTab(t) {
 document.querySelectorAll("nav button").forEach(b => b.onclick = () => showTab(b.dataset.tab));
 
 function renderAll() {
-  renderFilters(); renderList();
+  renderFilters(); renderList(); updateWeekBadge();
   if ($("#tab-spin").classList.contains("on")) renderSpin();
   if (map && $("#tab-map").classList.contains("on")) renderMap(false);
   if ($("#tab-plans").classList.contains("on")) renderPlans();
