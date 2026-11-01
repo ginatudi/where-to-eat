@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Widget setup</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body{margin:0;padding:20px 16px 60px;background:#000;color:#f2f2ff;font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:560px;margin:auto}
+h1{font-size:22px;background:linear-gradient(135deg,#4c8dff,#9b6bff);-webkit-background-clip:text;background-clip:text;color:transparent}
+ol{padding-left:20px;line-height:1.7;color:#cfcfee}
+textarea{width:100%;height:210px;background:#0d0d1a;color:#f2f2ff;border:1px solid #25254a;border-radius:12px;padding:12px;font-size:13px;font-family:ui-monospace,Menlo,monospace;box-sizing:border-box}
+button{width:100%;margin:12px 0;padding:14px;border:0;border-radius:14px;background:linear-gradient(135deg,#4c8dff,#9b6bff);color:#fff;font-size:16px;font-weight:700}
+.ok{color:#4c8dff;text-align:center;min-height:20px}
+small{color:#8c8cb3}
+</style></head><body>
+<h1>Where to Eat widget</h1>
+<button id="copy">Copy the widget script</button>
+<div class="ok" id="ok"></div>
+<ol>
+<li>Tap the button above to copy.</li>
+<li>Open the Scriptable app and tap + in the top right.</li>
+<li>Paste the script, then tap the name at the top and call it Where to Eat.</li>
+<li>Go to your home screen, touch and hold an empty spot, tap + and choose Scriptable.</li>
+<li>Pick the small or medium size, tap Add Widget, then tap the widget and choose Script, then Where to Eat.</li>
+</ol>
+<textarea id="code" readonly>try {
+  var code = await new Request("https://ginatudi.github.io/where-to-eat/widget.js?t=" + Date.now()).loadString();
+  var w = await eval("(async()=>{" + code + "\n})()");
+} catch (e) {
+  var w = new ListWidget();
+  w.addText("Widget error: " + e.message);
+}
+if (config.runsInWidget) { Script.setWidget(w); } else { await w.presentMedium(); }
+Script.complete();</textarea>
+<p><small>This tiny script loads the real widget from the web each time, so changes I make show up on their own and you never paste again.</small></p>
+<script>
+document.getElementById("copy").onclick=async function(){
+  var t=document.getElementById("code");
+  try{await navigator.clipboard.writeText(t.value);document.getElementById("ok").textContent="Copied!";}
+  catch(e){t.focus();t.select();t.setSelectionRange(0,99999);document.execCommand("copy");document.getElementById("ok").textContent="Copied! If not, press and hold the box and tap Copy.";}
+};
+</script></body></html>
