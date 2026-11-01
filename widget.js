@@ -88,35 +88,33 @@ function bigCount(parent, size) {
   txt(c, "this week", 11, DIM, false);
   return r;
 }
-function weekStrip(parent, circle, showNums) {
+function weekStrip(parent, wd, ht, mode) {
   var r = hrow(parent);
   for (var i = 0; i < 7; i++) {
     var d = new Date(ws.getFullYear(), ws.getMonth(), ws.getDate() + i);
     var key = ymd(d);
-    var has = week.some(function (p) { return p.planDate === key; });
+    var plan = week.filter(function (p) { return p.planDate === key; })[0];
     var isToday = key === today;
     var isPast = key < today;
     if (i > 0) r.addSpacer();
-    var col = vcol(r);
-    col.centerAlignContent();
-    var lt = txt(col, DAY1[i], 9, isToday ? WHITE : DIM, isToday);
-    lt.centerAlignText();
-    col.addSpacer(3);
-    var c = col.addStack();
-    c.layoutHorizontally();
+    var c = r.addStack();
+    c.layoutVertically();
     c.centerAlignContent();
-    c.size = new Size(circle, circle);
-    c.cornerRadius = circle / 2;
-    if (has) { c.backgroundColor = BLUE; }
-    else if (isPast) { c.backgroundColor = CARD2; }
-    else { c.backgroundColor = CARD; }
+    c.size = new Size(wd, ht);
+    c.cornerRadius = mode === "mini" ? 6 : 10;
+    c.backgroundColor = plan ? BLUE : (isPast ? CARD2 : CARD);
     if (isToday) { c.borderWidth = 2; c.borderColor = PURPLE; }
-    if (showNums) {
-      var nt = txt(c, d.getDate(), circle > 26 ? 12 : 10, has ? WHITE : (isPast ? FAINT : DIM), has || isToday);
-      nt.centerAlignText();
-      nt.minimumScaleFactor = 1;
-    } else if (has) {
-      icon(c, "fork.knife", circle * 0.55, WHITE);
+    var lab = mode === "mini" ? DAY1[i] : DAY3[i];
+    var a = txt(c, lab, mode === "mini" ? 8 : 8, plan ? WHITE : (isPast ? FAINT : DIM), true);
+    a.centerAlignText();
+    var b = txt(c, d.getDate(), mode === "mini" ? 10 : 15, plan ? WHITE : (isPast ? FAINT : WHITE), true);
+    b.centerAlignText();
+    b.minimumScaleFactor = 1;
+    if (mode === "full") {
+      var nm = plan ? plan.name.split(" ")[0].slice(0, 7) : " ";
+      var n = txt(c, nm, 8, plan ? WHITE : DIM, false);
+      n.centerAlignText();
+      n.minimumScaleFactor = 0.7;
     }
   }
   return r;
@@ -185,7 +183,7 @@ if (fam === "small") {
   w.addSpacer(6);
   bigCount(w, 40);
   w.addSpacer();
-  weekStrip(w, 15, false);
+  weekStrip(w, 16, 24, "mini");
   w.addSpacer(8);
   if (next) {
     var sr = hrow(w);
@@ -217,14 +215,14 @@ if (fam === "small") {
     empty("Plan a night out");
   }
   w.addSpacer();
-  weekStrip(w, 25, true);
+  weekStrip(w, 38, 46, "full");
 } else {
   header(false);
   w.addSpacer(10);
   var t2 = hrow(w);
   bigCount(t2, 44);
   w.addSpacer(12);
-  weekStrip(w, 32, true);
+  weekStrip(w, 38, 62, "full");
   w.addSpacer(14);
   label("COMING UP");
   w.addSpacer(6);
