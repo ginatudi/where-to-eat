@@ -98,6 +98,9 @@ details p,details li{color:var(--muted);font-size:14px;line-height:1.5}
 .plan{color:var(--blue)!important;border-color:#2b3a78!important}
 .sub{color:var(--muted);font-size:13px;margin:4px 2px 8px}
 .links button{font-size:13px;font-weight:600;color:#fff;background:var(--card2);border:1px solid var(--line);padding:6px 12px;border-radius:99px}
+#list.compact .links{display:none}
+.countrow{display:flex;align-items:center;justify-content:space-between}
+.tog{background:var(--card);border:1px solid var(--line);color:var(--muted);font-size:12px;font-weight:600;padding:5px 12px;border-radius:99px}
 .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.9) contrast(.95)}
 .links{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
 .links a{font-size:13px;font-weight:600;color:#fff!important;text-decoration:none;background:var(--card2);border:1px solid var(--line);padding:6px 12px;border-radius:99px}
@@ -114,7 +117,7 @@ details p,details li{color:var(--muted);font-size:14px;line-height:1.5}
 <main>
   <section id="tab-list" class="tab on">
     <div class="filters" id="filtersList"></div>
-    <div class="count" id="countList"></div>
+    <div class="count countrow"><span id="countList"></span><button class="tog" id="togBtns"></button></div>
     <div id="list"></div>
   </section>
   <section id="tab-map" class="tab"><div id="map"></div></section>
@@ -484,6 +487,11 @@ function renderAll() {
   if (map && $("#tab-map").classList.contains("on")) renderMap(false);
   if ($("#tab-plans").classList.contains("on")) renderPlans();
 }
+let compact = true;
+try { compact = localStorage.getItem("wte-compact") !== "0"; } catch {}
+function applyCompact() { $("#list").classList.toggle("compact", compact); $("#togBtns").textContent = compact ? "Show buttons" : "Hide buttons"; }
+$("#togBtns").onclick = () => { compact = !compact; try { localStorage.setItem("wte-compact", compact ? "1" : "0"); } catch {} applyCompact(); };
+applyCompact();
 store.start(arr => { places = arr; renderAll(); });
 </script>
 </body>
