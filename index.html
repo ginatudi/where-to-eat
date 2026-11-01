@@ -51,7 +51,8 @@ select:focus,input:focus{outline:2px solid var(--purple)}
 .info{flex:1;min-width:0}
 .name{font-weight:700;font-size:17px}
 .addr{color:var(--muted);font-size:13px;margin-top:2px;text-decoration:none;display:block}
-.chip{display:inline-block;font-size:11px;color:var(--purple);border:1px solid #3a2f6b;border-radius:99px;padding:2px 8px;margin-top:6px}
+.two{display:flex;gap:8px}.two select{flex:1;min-width:0}
+.chip{margin-right:6px;display:inline-block;font-size:11px;color:var(--purple);border:1px solid #3a2f6b;border-radius:99px;padding:2px 8px;margin-top:6px}
 .more{background:none;border:0;color:var(--muted);font-size:20px;padding:0 4px}
 .rate{margin-top:12px;padding-top:12px;border-top:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
 .stars button{background:none;border:0;font-size:26px;color:#33335a;padding:0 2px}
@@ -188,7 +189,7 @@ if (useFirebase) {
 function setSync(t) { $("#sync").textContent = t === "live" ? "● live" : t; }
 
 /* ---------- filters (shared by List and Spin) ---------- */
-const filter = { status: "new", area: "" };
+const filter = { status: "new", area: "", price: "" };
 const STATUSES = [["all","All"],["new","Not been"],["been","Been"],["back","Go back"]];
 
 function applyFilter(arr) {
@@ -197,6 +198,7 @@ function applyFilter(arr) {
     if (filter.status === "been" && !p.visited) return false;
     if (filter.status === "back" && !(p.visited && p.goBack === "yes")) return false;
     if (filter.area && p.area !== filter.area) return false;
+    if (filter.price && p.price && p.price > +filter.price) return false;
     return true;
   });
 }
@@ -206,9 +208,9 @@ function renderFilters() {
   ["#filtersList", "#filtersSpin"].forEach(sel => {
     const box = $(sel);
     box.innerHTML = `<div class="seg">${STATUSES.map(([k, l]) => `<button data-s="${k}" class="${filter.status === k ? "on" : ""}">${l}</button>`).join("")}</div>
-      <select aria-label="Location"><option value="">All locations</option>${areas.map(a => `<option ${filter.area === a ? "selected" : ""}>${esc(a)}</option>`).join("")}</select>`;
+      <div class="two"><select data-k="area" aria-label="Location"><option value="">All locations</option>${areas.map(a => `<option ${filter.area === a ? "selected" : ""}>${esc(a)}</option>`).join("")}</select><select data-k="price" aria-label="Price">${[["", "Any price"], ["1", "$ only"], ["2", "Up to $$"], ["3", "Up to $$$"]].map(([v, l]) => `<option value="${v}" ${filter.price === v ? "selected" : ""}>${l}</option>`).join("")}</select></div>`;
     box.querySelectorAll("button").forEach(b => b.onclick = () => { filter.status = b.dataset.s; renderAll(); });
-    box.querySelector("select").onchange = e => { filter.area = e.target.value; renderAll(); };
+    box.querySelectorAll("select").forEach(s => s.onchange = e => { filter[s.dataset.k] = e.target.value; renderAll(); });
   });
 }
 
@@ -217,7 +219,7 @@ function stars(p) {
   return [1,2,3,4,5].map(n => `<button data-act="star" data-n="${n}" class="${(p.rating || 0) >= n ? "on" : ""}" aria-label="${n} stars">★</button>`).join("");
 }
 function renderList() {
-  const arr = applyFilter(places).sort((a, b) => (a.visited - b.visited) || (b.createdAt - a.createdAt));
+  const arr = applyFilter(places).sort((a, b) => (a.visited - b.visited) || ((b.want || 0) - (a.want || 0)) || (b.createdAt - a.createdAt));
   $("#countList").textContent = `${arr.length} of ${places.length} places`;
   const box = $("#list");
   if (!arr.length) { box.innerHTML = `<div class="empty">${places.length ? "Nothing matches these filters." : "No places yet. Tap + to add your first one."}</div>`; return; }
@@ -228,7 +230,7 @@ function renderList() {
         <div class="info">
           <div class="name">${esc(p.name)}</div>
           <a class="addr" href="https://maps.apple.com/?q=${encodeURIComponent(p.name + " " + p.address)}" target="_blank" rel="noopener">${esc(p.address)}</a>
-          ${p.area ? `<span class="chip">${esc(p.area)}</span>` : ""}
+          ${p.area ? `<span class="chip">${esc(p.area)}</span>` : ""}${p.price ? `<span class="chip">${"$".repeat(p.price)}</span>` : ""}${p.want ? `<span class="chip">Want ${p.want}/5</span>` : ""}
           ${linksHtml(p)}
         </div>
         <button class="more" data-act="edit" aria-label="Edit">⋯</button>
@@ -266,11 +268,14 @@ function formSheet(title, p, onSave, onDelete) {
     <input id="fName" placeholder="Restaurant name" value="${esc(p.name || "")}" autocomplete="off">
     <input id="fAddr" placeholder="Address (street, city)" value="${esc(p.address || "")}" autocomplete="off">
     <input id="fLink" placeholder="Menu or website link (optional)" value="${esc(p.link || "")}" autocomplete="off" inputmode="url">
+    <div class="hint">Price</div><div class="seg" id="fPrice">${[1, 2, 3].map(n => `<button type="button" data-v="${n}" class="${p.price === n ? "on" : ""}">${"$".repeat(n)}</button>`).join("")}</div>
+    <div class="hint">How bad do we want to go? (1 = maybe, 5 = need it)</div><div class="seg" id="fWant">${[1, 2, 3, 4, 5].map(n => `<button type="button" data-v="${n}" class="${p.want === n ? "on" : ""}">${n}</button>`).join("")}</div>
     <div class="hint" id="fMsg">Add the city so the map pin lands in the right place.</div>
     <button class="btn" id="fSave">Save</button>
     ${onDelete ? `<button class="btn danger" id="fDel">Delete place</button>` : ""}
     <button class="btn ghost" id="fCancel">Cancel</button>`;
   sheetBg.classList.add("on");
+  ["#fPrice", "#fWant"].forEach(sel => $(sel).querySelectorAll("button").forEach(b => b.onclick = () => { const on = b.classList.contains("on"); $(sel).querySelectorAll("button").forEach(x => x.classList.remove("on")); if (!on) b.classList.add("on"); }));
   $("#fCancel").onclick = closeSheet;
   if (onDelete) $("#fDel").onclick = () => { if (confirm("Delete this place?")) { onDelete(); closeSheet(); } };
   $("#fSave").onclick = async () => {
@@ -280,7 +285,8 @@ function formSheet(title, p, onSave, onDelete) {
     let geo = null;
     if (address && (address !== p.address || p.lat == null)) geo = (await geocode(address)) || (await geocode(name + " " + address));
     let link = $("#fLink").value.trim(); if (link && !/^https?:\/\//i.test(link)) link = "https://" + link;
-    const data = { name, address, link };
+    const pick = id => { const b = $(id + " button.on"); return b ? +b.dataset.v : 0; };
+    const data = { name, address, link, price: pick("#fPrice"), want: pick("#fWant") };
     if (geo) Object.assign(data, geo);
     else if (address !== p.address) { data.lat = null; data.lng = null; }
     await onSave(data, !!geo || !address);
@@ -315,7 +321,7 @@ function renderMap(fit) {
   places.filter(p => p.lat != null && p.lng != null).forEach(p => {
     const c = p.visited ? "#4c8dff" : "#9b6bff";
     const m = L.circleMarker([p.lat, p.lng], { radius: 11, color: "#fff", weight: 2, fillColor: c, fillOpacity: 1 }).addTo(layer);
-    m.bindPopup(`<b>${esc(p.name)}</b><br>${esc(p.address)}<br>${p.visited ? "★".repeat(p.rating || 0) + (p.rating ? " " : "") + "Been" + (p.goBack === "yes" ? " · go back" : p.goBack === "no" ? " · skip" : "") : "Not been yet"}${linksHtml(p)}`);
+    m.bindPopup(`<b>${esc(p.name)}</b><br>${esc(p.address)}<br>${p.price ? "$".repeat(p.price) + " · " : ""}${p.want ? "Want " + p.want + "/5 · " : ""}${p.visited ? "★".repeat(p.rating || 0) + (p.rating ? " " : "") + "Been" + (p.goBack === "yes" ? " · go back" : p.goBack === "no" ? " · skip" : "") : "Not been yet"}${linksHtml(p)}`);
     pts.push([p.lat, p.lng]);
   });
   if (fit && pts.length) map.fitBounds(pts, { padding: [50, 50], maxZoom: 14 });
